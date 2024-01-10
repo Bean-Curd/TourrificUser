@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Tour-rific User Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="shortcut icon"
+      type="image/png"
+      href="assets/images/icon/favicon.ico"
+    />
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="assets/css/font-awesome.min.css" />
+    <link rel="stylesheet" href="assets/css/themify-icons.css" />
+    <link rel="stylesheet" href="assets/css/metisMenu.css" />
+    <link rel="stylesheet" href="assets/css/owl.carousel.min.css" />
+    <link rel="stylesheet" href="assets/css/slicknav.min.css" />
+    <!-- amchart css -->
+    <link
+      rel="stylesheet"
+      href="https://www.amcharts.com/lib/3/plugins/export/export.css"
+      type="text/css"
+      media="all"
+    />
+    <!-- others css -->
+    <link rel="stylesheet" href="assets/css/typography.css" />
+    <link rel="stylesheet" href="assets/css/default-css.css" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <link rel="stylesheet" href="assets/css/responsive.css" />
+    <!-- modernizr css -->
+    <script src="assets/js/vendor/modernizr-2.8.3.min.js"></script>
+  </head>
+
+  <body>
+    <script
+      type="module"
+      src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"
+    ></script>
+    <script type="module">
+      import { FIREBASE_CONFIG } from "./config.js";
+      //for firebase app
+      import {
+        //determine which services you want to use
+        initializeApp,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-app.js";
+      //for realtime database
+      import {
+        //determine which services you want to use
+        getDatabase,
+        ref,
+        set,
+        get,
+        onValue,
+        push,
+        child,
+        update,
+        remove,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-database.js";
+      //for auth
+      import {
+        //determine which services you want to use
+        getAuth,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        onAuthStateChanged,
+        signOut,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-auth.js";
+
+      const app = initializeApp(FIREBASE_CONFIG);
+      const db = getDatabase();
+      const auth = getAuth();
+
+      const player = ref(db, "players");
+
+      var UID = "";
+      let message = document.getElementById("message");
+
+      let btnSignInUser = document.getElementById("sign_in_user");
+      btnSignInUser.addEventListener("click", function (e) {
+        e.preventDefault();
+        let email = document.getElementById("input_email").value;
+        let password = document.getElementById("input_password").value;
+
+        //call the function to login user
+        loginUser(email, password);
+        console.log("email" + email + "password" + password);
+      });
+
+      function loginUser(email, password) {
+        signInWithEmailAndPassword(auth, email, password)
+          .then((userCredential) => {
+            const user = userCredential.user;
+            UID = user.uid;
+
+            (async () => {
+              await checkUser(UID);
+            })();
+          })
+          .catch((error) => {
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            message.style.display = "block";
+            message.innerHTML = `ErrorCode: ${errorCode} -> Message: ${errorMessage}`;
+            console.log(`ErrorCode: ${errorCode} -> Message: ${errorMessage}`);
+          });
+      }
+      function checkUser(uid) {
+        console.log("checking user for: " + uid);
+        get(ref(db, "players/" + uid)).then((snapshot) => {
+          if (snapshot.exists()) {
+            try {
+              let content = "";
+              message = document.getElementById("message");
+              message.innerHTML = `User: ${uid} is signed in`;
+              message.style.display = "block";
+              clearAuthInputs(); //Function below
+
+              //Set the user to the local storage
+              localStorage.setItem("user", uid);
+              window.location.href = "userProfile.html";
+            } catch (error) {
+              console.log(error);
+            }
+          } else {
+            console.log("not user");
+            message = document.getElementById("message");
+            message.innerHTML = `Account is not an existing user: Try signing up instead`;
+            message.style.display = "block";
+            UID = "";
+            signOut(auth);
+            clearAuthInputs();
+            return UID;
+          }
+        });
+      }
+      function clearAuthInputs() {
+        document.getElementById("input_email").value = "";
+        document.getElementById("input_password").value = "";
+      }
+    </script>
+    <!-- preloader area start -->
+    <div id="preloader">
+      <div class="loader"></div>
+    </div>
+    <!-- preloader area end -->
+    <!-- login area start -->
+    <div class="login-area">
+      <div class="container">
+        <div class="login-box ptb--80">
+          <form>
+            <div class="login-form-head">
+              <h4>Login</h4>
+              <p>Log in to your Tour-rific account here!</p>
+            </div>
+            <div class="login-form-body">
+              <div class="form-gp">
+                <label>Email address</label>
+                <input type="email" id="input_email" required />
+                <i class="ti-email"></i>
+                <div class="text-danger"></div>
+              </div>
+              <div class="form-gp">
+                <label>Password</label>
+                <input type="password" id="input_password" required />
+                <i class="ti-lock"></i>
+                <div class="text-danger"></div>
+              </div>
+              <div class="row mb-4 rmber-area">
+                <div class="col-6">
+                  <div class="custom-control custom-checkbox mr-sm-2">
+                    <input
+                      type="checkbox"
+                      class="custom-control-input"
+                      id="customControlAutosizing"
+                    />
+                    <label
+                      class="custom-control-label"
+                      for="customControlAutosizing"
+                      >Remember Me</label
+                    >
+                  </div>
+                </div>
+                <div class="col-6 text-right">
+                  <a>Forgot Password?</a>
+                </div>
+              </div>
+              <div
+                id="message"
+                style="display: none"
+                class="alert alert-primary mt-1"
+              ></div>
+              <div class="submit-btn-area">
+                <button id="sign_in_user" type="submit">
+                  Submit <i class="ti-arrow-right"></i>
+                </button>
+              </div>
+              <div class="row mt-4 rmber-area">
+                <div class="col-12 text-center">
+                  <a>Don't have an account? </a
+                  ><a href="signup.html">Sign Up</a>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- login area end -->
+
+    <!-- jquery latest version -->
+    <script src="assets/js/vendor/jquery-2.2.4.min.js"></script>
+    <!-- bootstrap 4 js -->
+    <script src="assets/js/popper.min.js"></script>
+    <script src="assets/js/bootstrap.min.js"></script>
+    <script src="assets/js/owl.carousel.min.js"></script>
+    <script src="assets/js/metisMenu.min.js"></script>
+    <script src="assets/js/jquery.slimscroll.min.js"></script>
+    <script src="assets/js/jquery.slicknav.min.js"></script>
+
+    <!-- others plugins -->
+    <script src="assets/js/plugins.js"></script>
+    <script src="assets/js/scripts.js"></script>
+  </body>
+</html>

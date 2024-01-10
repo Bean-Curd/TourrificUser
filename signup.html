@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Tour-rific User Sign Up</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="shortcut icon"
+      type="image/png"
+      href="assets/images/icon/favicon.ico"
+    />
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="assets/css/font-awesome.min.css" />
+    <link rel="stylesheet" href="assets/css/themify-icons.css" />
+    <link rel="stylesheet" href="assets/css/metisMenu.css" />
+    <link rel="stylesheet" href="assets/css/owl.carousel.min.css" />
+    <link rel="stylesheet" href="assets/css/slicknav.min.css" />
+    <!-- amchart css -->
+    <link
+      rel="stylesheet"
+      href="https://www.amcharts.com/lib/3/plugins/export/export.css"
+      type="text/css"
+      media="all"
+    />
+    <!-- others css -->
+    <link rel="stylesheet" href="assets/css/typography.css" />
+    <link rel="stylesheet" href="assets/css/default-css.css" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <link rel="stylesheet" href="assets/css/responsive.css" />
+    <!-- modernizr css -->
+    <script src="assets/js/vendor/modernizr-2.8.3.min.js"></script>
+  </head>
+
+  <body>
+    <script
+      type="module"
+      src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"
+    ></script>
+    <script type="module">
+      import { FIREBASE_CONFIG } from "./config.js";
+      //for firebase app
+      import {
+        //determine which services you want to use
+        initializeApp,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-app.js";
+      //for realtime database
+      import {
+        //determine which services you want to use
+        getDatabase,
+        ref,
+        set,
+        get,
+        onValue,
+        push,
+        child,
+        update,
+        remove,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-database.js";
+      //for auth
+      import {
+        //determine which services you want to use
+        getAuth,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        onAuthStateChanged,
+        signOut,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-auth.js";
+
+      const app = initializeApp(FIREBASE_CONFIG);
+      const db = getDatabase();
+      const auth = getAuth();
+
+      const player = ref(db, "players");
+
+      var UID = "";
+      var newPlayers = 0;
+      let message = document.getElementById("message");
+
+      const date = new Date();
+      var year = date.getFullYear();
+      var month = date.getMonth() + 1;
+      var day = date.getDate();
+
+      if (month.toString().length == 1) {
+        month = "0" + month;
+      }
+      if (day.toString().length == 1) {
+        day = "0" + day;
+      }
+
+      var finalDate = parseInt(year + "" + month + "" + day);
+
+      (async () => {
+        await check();
+      })();
+
+      function check() {
+        //Check if things are in the firebase yet
+        console.log("checking");
+        get(ref(db, "amountCompleted/" + finalDate)).then((snapshot) => {
+          if (snapshot.exists()) {
+          } else {
+            set(ref(db, "amountCompleted/" + finalDate), 0);
+          }
+        });
+        get(ref(db, "dailyActiveUsers/" + finalDate)).then((snapshot) => {
+          if (snapshot.exists()) {
+          } else {
+            set(ref(db, "dailyActiveUsers/" + finalDate), 0);
+          }
+        });
+        get(ref(db, "dailyNewUsers/" + finalDate)).then((snapshot) => {
+          if (snapshot.exists()) {
+          } else {
+            set(ref(db, "dailyNewUsers/" + finalDate), 0);
+          }
+        });
+        get(ref(db, "totalSessionTime/" + finalDate)).then((snapshot) => {
+          if (snapshot.exists()) {
+          } else {
+            set(ref(db, "totalSessionTime/" + finalDate), 0);
+          }
+        });
+        console.log("done checking");
+      }
+
+      let btnSignUpUser = document.getElementById("sign_up_user");
+      btnSignUpUser.addEventListener("click", function (e) {
+        e.preventDefault();
+        let username = document.getElementById("input_username").value;
+        let email = document.getElementById("input_email").value;
+        let password = document.getElementById("input_password").value;
+
+        //call the function to create a new user
+        if (
+          username != null &&
+          username != "" &&
+          email != null &&
+          email != "" &&
+          password != null &&
+          password != ""
+        ) {
+          console.log(
+            "username" + username + "email" + email + "password" + password
+          );
+          createUser(username, email, password);
+        } else {
+          message = document.getElementById("message");
+          message.innerHTML = `Please fill in all the fields`;
+          message.style.display = "block";
+        }
+      });
+
+      function createUser(username, email, password) {
+        console.log("creating the user");
+        createUserWithEmailAndPassword(auth, email, password)
+          .then((userCredential) => {
+            const user = userCredential.user;
+            console.log(`User ID: ${user.uid} is created and signed in`);
+            UID = user.uid;
+            //console.log(`Full User Details\n ${JSON.stringify(userCredential)}`);
+
+            (async () => {
+              await getNewUsers(UID);
+              await setStats(UID, username, email, password);
+            })();
+          })
+          .catch((error) => {
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            console.log(`ErrorCode: ${errorCode} -> Message: ${errorMessage}`);
+
+            let message = document.getElementById("message");
+            message.style.display = "block";
+            message.innerHTML = `ErrorCode: ${errorCode} -> Message: ${errorMessage}`;
+          });
+      }
+      async function getNewUsers(uid) {
+        console.log("getting new users");
+        await get(ref(db, "dailyNewUsers/" + finalDate)).then((snapshot) => {
+          if (snapshot.exists()) {
+            try {
+              let content = "";
+              newPlayers = snapshot.val();
+              console.log("gottem" + newPlayers);
+              return newPlayers;
+            } catch (error) {
+              console.log(error);
+            }
+          } else {
+            console.log("snapshot does not exist");
+          }
+        });
+      }
+      async function setStats(uid, username, email, password) {
+        console.log(newPlayers);
+        await set(ref(db, "dailyNewUsers/" + finalDate), newPlayers + 1);
+        await set(ref(db, "players/" + uid), {
+          active: false,
+          coins: 0,
+          createdOn: Math.floor(Date.now() / 1000),
+          email: email,
+          lastLoggedIn: 0,
+          password: password,
+          totalTime: 0,
+          updatedOn: Math.floor(Date.now() / 1000),
+          username: username,
+        });
+        await set(ref(db, "puzzlePieces/" + uid), {
+          game1: false,
+          game2: false,
+          game3: false,
+        });
+        await set(ref(db, "timeTaken/" + uid), {
+          game1: 0,
+          game2: 0,
+          game3: 0,
+          other: 0,
+        })
+          .then((snapshot) => {
+            console.log("Player is created");
+            message = document.getElementById("message");
+            message.innerHTML = `User: ${username} is signed in`;
+            message.style.display = "block";
+            clearAuthInputs(); //Function below
+            newPlayers = 0;
+
+            //Set the user to the local storage
+            localStorage.setItem("user", uid);
+            window.location.href = "userProfile.html";
+          })
+          .catch((error) => {
+            message = document.getElementById("message");
+            message.innerHTML = `Account cannot be created: Try logging in instead`;
+            message.style.display = "block";
+            UID = "";
+            clearAuthInputs();
+            console.log(`Error creating player ${error}`);
+          });
+      }
+      function clearAuthInputs() {
+        document.getElementById("input_username").value = "";
+        document.getElementById("input_email").value = "";
+        document.getElementById("input_password").value = "";
+      }
+    </script>
+    <!-- preloader area start -->
+    <div id="preloader">
+      <div class="loader"></div>
+    </div>
+    <!-- preloader area end -->
+    <!-- login area start -->
+    <div class="login-area">
+      <div class="container">
+        <div class="login-box ptb--100">
+          <form>
+            <div class="login-form-head">
+              <h4>Sign Up</h4>
+            </div>
+            <div class="login-form-body">
+              <div class="form-gp">
+                <label>Username</label>
+                <input type="text" id="input_username" required />
+                <i class="ti-user"></i>
+                <div class="text-danger"></div>
+              </div>
+              <div class="form-gp">
+                <label>Email address</label>
+                <input type="email" id="input_email" required />
+                <i class="ti-email"></i>
+                <div class="text-danger"></div>
+              </div>
+              <div class="form-gp">
+                <label>Password</label>
+                <input type="password" id="input_password" required />
+                <i class="ti-lock"></i>
+                <div class="text-danger"></div>
+              </div>
+              <div
+                id="message"
+                style="display: none"
+                class="alert alert-primary mt-1"
+              ></div>
+              <div class="submit-btn-area">
+                <button id="sign_up_user" type="submit">
+                  Submit <i class="ti-arrow-right"></i>
+                </button>
+              </div>
+              <div class="row mt-4 rmber-area">
+                <div class="col-12 text-center">
+                  <a>Have an account? </a><a href="index.html">Login</a>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- login area end -->
+
+    <!-- jquery latest version -->
+    <script src="assets/js/vendor/jquery-2.2.4.min.js"></script>
+    <!-- bootstrap 4 js -->
+    <script src="assets/js/popper.min.js"></script>
+    <script src="assets/js/bootstrap.min.js"></script>
+    <script src="assets/js/owl.carousel.min.js"></script>
+    <script src="assets/js/metisMenu.min.js"></script>
+    <script src="assets/js/jquery.slimscroll.min.js"></script>
+    <script src="assets/js/jquery.slicknav.min.js"></script>
+
+    <!-- others plugins -->
+    <script src="assets/js/plugins.js"></script>
+    <script src="assets/js/scripts.js"></script>
+  </body>
+</html>

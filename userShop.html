@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Tour-rific User Shop</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" type="image/png" href="assets/images/icon/favicon.ico">
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="assets/css/font-awesome.min.css" />
+    <link rel="stylesheet" href="assets/css/themify-icons.css" />
+    <link rel="stylesheet" href="assets/css/metisMenu.css" />
+    <link rel="stylesheet" href="assets/css/owl.carousel.min.css" />
+    <link rel="stylesheet" href="assets/css/slicknav.min.css" />
+    <!-- amchart css -->
+    <link
+      rel="stylesheet"
+      href="https://www.amcharts.com/lib/3/plugins/export/export.css"
+      type="text/css"
+      media="all"
+    />
+    <!-- others css -->
+    <link rel="stylesheet" href="assets/css/typography.css" />
+    <link rel="stylesheet" href="assets/css/default-css.css" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <link rel="stylesheet" href="assets/css/responsive.css" />
+    <!-- modernizr css -->
+    <script src="assets/js/vendor/modernizr-2.8.3.min.js"></script>
+  </head>
+
+  <body>
+    <script
+      type="module"
+      src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"
+    ></script>
+    <script type="module">
+      import { FIREBASE_CONFIG } from "./config.js";
+      //for firebase app
+      import {
+        //determine which services you want to use
+        initializeApp,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-app.js";
+      //for realtime database
+      import {
+        //determine which services you want to use
+        getDatabase,
+        ref,
+        set,
+        get,
+        onValue,
+        push,
+        child,
+        update,
+        remove,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-database.js";
+      //for auth
+      import {
+        //determine which services you want to use
+        getAuth,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        onAuthStateChanged,
+        signOut,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-auth.js";
+
+      const app = initializeApp(FIREBASE_CONFIG);
+      const db = getDatabase();
+      const auth = getAuth();
+
+      const UID = localStorage.getItem("user");
+
+      const players = ref(db, "players");
+
+      (async () => {
+        await getPlayers();
+      })();
+
+      async function getPlayers() {
+        console.log("getting player: " + UID);
+        await get(ref(db, "players/" + UID)).then((snapshot) => {
+          if (snapshot.exists()) {
+            try {
+              let content = "";
+              snapshot.forEach((childSnapshot) => {
+                if (childSnapshot.key == "coins") {
+                  if (localStorage.getItem("userCoins") != null){ //if it exists, get and update, else, set new one
+                    let amt = localStorage.getItem("userCoins");
+                    set(ref(db, "players/" + UID + "/coins"), amt);
+                    set(
+                      ref(db, "players/" + UID + "/updatedOn"),
+                      Math.floor(Date.now() / 1000)
+                    );
+                    $("#user_coins").text(amt + " coins");
+                  }
+                  else {
+                    localStorage.setItem("userCoins", childSnapshot.val());
+                    $("#user_coins").text(childSnapshot.val() + " coins");
+                  }
+                  
+                } else if (childSnapshot.key == "username") {
+                  $("#username").text(childSnapshot.val());
+                }
+              });
+            } catch (error) {
+              console.log(error);
+            }
+          } else {
+            console.log("snapshot does not exist");
+          }
+        });
+      }
+
+      let btnLogOut = document.getElementById("logout");
+      btnLogOut.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        console.log("signing out");
+        signOut(auth);
+        //Remove the user from the local storage
+        localStorage.removeItem("user");
+        localStorage.removeItem("userCoins");
+        window.location.href = "index.html";
+      });
+    </script>
+    <!-- preloader area start -->
+    <div id="preloader">
+      <div class="loader"></div>
+    </div>
+    <!-- preloader area end -->
+    <!-- page container area start -->
+    <div class="page-container">
+      <!-- sidebar menu area start -->
+      <div class="sidebar-menu">
+        <div class="sidebar-header">
+          <div class="logo">
+            <a href="userProfile.html"
+              ><img src="assets/images/icon/logo.png" alt="logo"
+            /></a>
+          </div>
+        </div>
+        <div class="main-menu">
+          <div class="menu-inner">
+            <nav>
+              <ul class="metismenu" id="menu">
+                <li>
+                  <a href="userProfile.html">Profile</a>
+                </li>
+                <li class="active"><a href="userShop.html">Shop</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+      <!-- sidebar menu area end -->
+      <!-- main content area start -->
+      <div class="main-content">
+        <!-- header area start -->
+        <div class="header-area">
+          <div class="row align-items-center">
+            <!-- nav and search button -->
+            <div class="col-md-6 col-sm-8 clearfix">
+              <div class="nav-btn pull-left">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+            <!-- profile info & task notification -->
+            <div class="col-md-6 col-sm-4 clearfix">
+              <ul class="notification-area pull-right">
+                <li id="full-view"><i class="ti-fullscreen"></i></li>
+                <li id="full-view-exit"><i class="ti-zoom-out"></i></li>
+                <li class="settings-btn" onclick="toggleShop()">
+                  <i class="ti-shopping-cart"></i>
+                </li>
+                <li class="settings-btn" onclick="toggleSetting()">
+                  <i class="ti-settings"></i>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <!-- header area end -->
+        <!-- offset area start -->
+        <div class="offset-area">
+          <div class="offset-close"><i class="ti-close"></i></div>
+          <ul class="nav offset-menu-tab">
+            <li>
+              <a class="active" data-toggle="tab" id="shop_toggle" href="#activity">Cart</a>
+            </li>
+            <li><a data-toggle="tab" id="setting_toggle" href="#settings">Settings</a></li>
+          </ul>
+          <div class="offset-content tab-content">
+            <div id="activity" class="tab-pane fade in show active">
+              <div class="recent-activity" id="shop_items">
+                <!-- <div class="timeline-task">
+                  <div class="icon bg3">
+                    <i class="fa fa-check"></i>
+                  </div>
+                  <div class="tm-title">
+                    <h4>Solved</h4>
+                  </div>
+                  <p>
+                    [Admin] Mushroom completed [User] Potato , [UID]
+                    A8vM47IfRnfzjXhho97rW0kZhUr2 's request.
+                  </p>
+                </div>
+                <div class="submit-btn-area">
+                  <button onclick="removeItem()" type="submit">
+                    Remove Item
+                  </button>
+                </div> -->
+              </div>
+            </div>
+            <div id="settings" class="tab-pane fade">
+              <div class="offset-settings">
+                <h4>General Settings</h4>
+                <div class="settings-list">
+                  <div class="s-settings">
+                    <div class="s-sw-title">
+                      <h5>Notifications</h5>
+                      <div class="s-swtich">
+                        <input type="checkbox" id="switch1" />
+                        <label for="switch1">Toggle</label>
+                      </div>
+                    </div>
+                    <p>Toggle 'On' to get all notifications.</p>
+                  </div>
+                  <div class="s-settings">
+                    <div class="s-sw-title">
+                      <h5>Link to Phone Number</h5>
+                      <div class="s-swtich">
+                        <input type="checkbox" id="switch3" checked />
+                        <label for="switch3">Toggle</label>
+                      </div>
+                    </div>
+                    <p>
+                      Toggle 'On' to link your account to your phone number.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <script>
+          function toggleShop() {
+            document.getElementById("shop_toggle").className = "active";
+            document.getElementById("setting_toggle").className = "inactive";
+            document.getElementById("activity").className = "tab-pane fade in show active";
+            document.getElementById("settings").className = "tab-pane fade";
+          }
+          function toggleSetting() {
+            document.getElementById("setting_toggle").className = "active";
+            document.getElementById("shop_toggle").className = "inactive";
+            document.getElementById("activity").className = "tab-pane fade";
+            document.getElementById("settings").className = "tab-pane fade in show active";
+          }
+        </script>
+        <!-- offset area end -->
+        <!-- page title area start -->
+        <div class="page-title-area">
+          <div class="row align-items-center">
+            <div class="col-sm-6">
+              <div class="breadcrumbs-area clearfix">
+                <h4 class="page-title pull-left">Tour-rific</h4>
+                <ul class="breadcrumbs pull-left">
+                  <li><a>User</a></li>
+                  <li><span>Shop</span></li>
+                </ul>
+              </div>
+            </div>
+            <div class="col-sm-6 clearfix">
+              <div class="user-profile pull-right">
+                <img
+                  class="avatar user-thumb"
+                  src="assets/images/author/avatar.png"
+                  alt="avatar"
+                />
+                <h4
+                  class="user-name dropdown-toggle"
+                  data-toggle="dropdown"
+                  id="username"
+                >
+                - <i class="fa fa-angle-down"></i>
+              </h4>
+              <div class="dropdown-menu">
+                <!-- <a class="dropdown-item" href="#">Profile</a> -->
+                <a class="dropdown-item" id="logout" href="index.html"
+                  >Log Out</a
+                >
+              </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- page title area end -->
+        <div class="main-content-inner">
+          <!-- normal alert area start -->
+          <div class="col-md-12 mt-5">
+            <div class="alert alert-danger" style="display: none" id="message">
+            </div>
+          </div>
+        <!-- normal alert area end -->
+          <!-- stats start -->
+          <div class="row">
+            <div class="col-md-12 mt-md-5 mb-3">
+              <div class="card">
+                <div class="seo-fact sbg4">
+                  <div
+                    class="p-4 d-flex justify-content-between align-items-center"
+                  >
+                    <div class="seofct-icon"><i class="ti-money"></i>Coins</div>
+                    <h2 id="user_coins">0</h2>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <div class="card-area">
+              <div class="row">
+                  <div class="col-lg-4 col-md-6 mt-5">
+                      <div class="card card-bordered">
+                          <img class="card-img-top img-fluid" src="assets/images/card/card-img1.jpg" alt="image">
+                          <div class="card-body">
+                              <h5 class="title">Singapore DUCKtours</h5>
+                              <p class="card-text">Get tickets for the Singapore DUCKtours! Enjoy a wonderful tour through Singapore with our insightful tour guides as you explore from both the land and sea in this thrilling and delightful 60-minute adventure!
+                              </p>
+                              <a onclick="let itemName = 'Singapore DUCKtours'; 
+                              let symbol = 'ti-anchor';
+                              let description = '[Item] Singapore DUCKtours Ticket X1 has been added to your cart!'; 
+                              let price = 2000;
+                              addShopItems(itemName, symbol, description, price)" class="btn btn-primary">Redeem: 2000</a>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="col-lg-4 col-md-6 mt-5">
+                      <div class="card card-bordered">
+                          <img class="card-img-top img-fluid" src="assets/images/card/card-img2.jpg" alt="image">
+                          <div class="card-body">
+                              <h5 class="title">Singapore Flyer Tickets</h5>
+                              <p class="card-text">Get tickets for the Singapore Flyer and the Time Capsule! Witness a breathtaking view of Singapore, and head on an adventure through Singapore's past, present and future in the Time Capsule!
+                              </p>
+                              <a onclick=" itemName = 'Singapore Flyer Tickets'; 
+                               symbol = 'ti-shine';
+                               description = '[Item] Singapore Flyer Ticket X1 has been added to your cart!'; 
+                               price = 2400;
+                              addShopItems(itemName, symbol, description, price)" class="btn btn-primary">Redeem: 2400</a>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="col-lg-4 col-md-6 mt-5">
+                      <div class="card card-bordered">
+                          <img class="card-img-top img-fluid" src="assets/images/card/card-img3.jpg" alt="image">
+                          <div class="card-body">
+                              <h5 class="title">Singapore Zoo Tours</h5>
+                              <p class="card-text">Get tickets to experience the best Singapore Zoo has to offer! Eat breakfast with orangutans, and see animals in their habitats! You will even have the opportunity to feed some ofthe animals you see!
+                              </p>
+                              <a onclick="itemName = 'Singapore Zoo Tours'; 
+                              symbol = 'ti-direction-alt';
+                              description = '[Item] Singapore Zoo Tours Ticket X1 has been added to your cart!'; 
+                              price = 3500;
+                              addShopItems(itemName, symbol, description, price)" class="btn btn-primary">Redeem: 3500</a>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              <div class="row">
+                <div class="col-lg-4 col-md-6 mt-5">
+                    <div class="card card-bordered">
+                        <img class="card-img-top img-fluid" src="assets/images/card/card-img4.jpg" alt="image">
+                        <div class="card-body">
+                            <h5 class="title">$50 MBS Gift Certificates</h5>
+                            <p class="card-text">Get a $50 Marina Bay Sands gift certificate to use in over 200 stores in Marina Bay Sands! They can be use at MBS stores, restaurants, the ArtScience Museum and at Sands events and rides.
+                            </p>
+                            <a onclick="itemName = '$50 MBS Gift Certificate'; 
+                            symbol = 'ti-gift';
+                            description = '[Item] $50 MBS Gift Certificate X1 has been added to your cart!'; 
+                            price = 2800;
+                            addShopItems(itemName, symbol, description, price)" class="btn btn-primary">Redeem: 2800</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6 mt-5">
+                    <div class="card card-bordered">
+                        <img class="card-img-top img-fluid" src="assets/images/card/card-img4.jpg" alt="image">
+                        <div class="card-body">
+                            <h5 class="title">$100 MBS Gift Certificates</h5>
+                            <p class="card-text">Get a $100 Marina Bay Sands gift certificate to use in over 200 stores in Marina Bay Sands! They can be use at MBS stores, restaurants, the ArtScience Museum and at Sands events and rides.
+                            </p>
+                            <a onclick="itemName = '$100 MBS Gift Certificate'; 
+                            symbol = 'ti-gift';
+                            description = '[Item] $100 MBS Gift Certificate X1 has been added to your cart!'; 
+                            price = 5000;
+                            addShopItems(itemName, symbol, description, price)"
+                            class="btn btn-primary">Redeem: 5000</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6 mt-5">
+                    <div class="card card-bordered">
+                        <img class="card-img-top img-fluid" src="assets/images/card/card-img5.jpg" alt="image">
+                        <div class="card-body">
+                            <h5 class="title">MBS Staycation</h5>
+                            <p class="card-text">Get a 3 day 2 nights staycation for 2 at Marina Bay Sands' 5-star luxury hotel! Have a delightful stay at the heart of Sinagpore, surronded by a near endless variety of activites for you to enjoy!
+                            </p>
+                            <a onclick="itemName = 'MBS Staycation'; 
+                            symbol = 'ti-bag';
+                            description = '[Item] 3 Days 2 Nights MBS Staycation X1 has been added to your cart!'; 
+                            price = 50000;
+                            addShopItems(itemName, symbol, description, price)" class="btn btn-primary">Redeem: 50000</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          </div>
+      </div>
+  </div>
+  <script>
+    function addShopItems(itemName, symbol, description, price){
+      console.log("adding item " + itemName);
+      let cart = document.getElementById("shop_items");
+      cart.innerHTML += `<div class="timeline-task">
+        <div class="icon bg3">
+          <i class="`+ symbol +`"></i>
+        </div>
+        <div class="tm-title">
+          <h4>`+ itemName + `</h4>
+        </div>
+        <p>` +
+          description +
+        `</p>
+      </div>`+`<div class="submit-btn-area">
+              <button onclick="buyItem(this.parentElement, '` + itemName + `', ` + price +`)" type="submit">
+                Buy Item
+              </button>
+              <button onclick="removeItem(this.parentElement)" type="submit" class="mt-2 mb-3">
+                Remove Item
+              </button>
+            </div>`;
+    }
+    function removeItem(parent){
+      let prevSibling = parent.previousElementSibling;
+      $('#shop_items').find(prevSibling).remove();
+      $('#shop_items').find(parent).remove();
+    }
+    function buyItem(parent, itemName, price){
+      let userCoins = localStorage.getItem("userCoins");
+      if (userCoins >= price){
+        console.log("buying item " + itemName);
+        
+        let amt = userCoins - price;
+
+        localStorage.setItem("userCoins", amt);
+        removeItem(parent);
+        location.reload();
+      }
+      else {
+        message = document.getElementById("message");
+        message.innerHTML = "You do not have enough coins to get this item!";
+        message.style.display = "block";
+      }
+    }
+  </script>
+      <!-- main content area end -->
+      <!-- footer area start-->
+      <footer>
+        <div class="footer-area">
+          <p>
+            © Copyright 2018. All right reserved. Template by
+            <a href="https://colorlib.com/wp/">Colorlib</a>.
+          </p>
+        </div>
+      </footer>
+      <!-- footer area end-->
+    </div>
+    <!-- page container area end -->
+    <!-- jquery latest version -->
+    <script src="assets/js/vendor/jquery-2.2.4.min.js"></script>
+    <!-- bootstrap 4 js -->
+    <script src="assets/js/popper.min.js"></script>
+    <script src="assets/js/bootstrap.min.js"></script>
+    <script src="assets/js/owl.carousel.min.js"></script>
+    <script src="assets/js/metisMenu.min.js"></script>
+    <script src="assets/js/jquery.slimscroll.min.js"></script>
+    <script src="assets/js/jquery.slicknav.min.js"></script>
+
+    <!-- start chart js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js"></script>
+    <!-- start highcharts js -->
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+    <!-- start zingchart js -->
+    <script src="https://cdn.zingchart.com/zingchart.min.js"></script>
+    <script>
+      zingchart.MODULESDIR = "https://cdn.zingchart.com/modules/";
+      ZC.LICENSE = [
+        "569d52cefae586f634c54f86dc99e6a9",
+        "ee6b7db5b51705a13dc2339db3edaf6d",
+      ];
+    </script>
+    <!-- start amcharts -->
+    <script src="https://www.amcharts.com/lib/3/amcharts.js"></script>
+    <script src="https://www.amcharts.com/lib/3/ammap.js"></script>
+    <script src="https://www.amcharts.com/lib/3/maps/js/worldLow.js"></script>
+    <script src="https://www.amcharts.com/lib/3/serial.js"></script>
+    <script src="https://www.amcharts.com/lib/3/plugins/export/export.min.js"></script>
+    <script src="https://www.amcharts.com/lib/3/themes/light.js"></script>
+    <!-- others plugins -->
+    <script src="assets/js/plugins.js"></script>
+    <script src="assets/js/scripts.js"></script>
+  </body>
+</html>

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Tour-rific User Statistics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" type="image/png" href="assets/images/icon/favicon.ico">
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="assets/css/font-awesome.min.css" />
+    <link rel="stylesheet" href="assets/css/themify-icons.css" />
+    <link rel="stylesheet" href="assets/css/metisMenu.css" />
+    <link rel="stylesheet" href="assets/css/owl.carousel.min.css" />
+    <link rel="stylesheet" href="assets/css/slicknav.min.css" />
+    <!-- amchart css -->
+    <link
+      rel="stylesheet"
+      href="https://www.amcharts.com/lib/3/plugins/export/export.css"
+      type="text/css"
+      media="all"
+    />
+    <!-- others css -->
+    <link rel="stylesheet" href="assets/css/typography.css" />
+    <link rel="stylesheet" href="assets/css/default-css.css" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <link rel="stylesheet" href="assets/css/responsive.css" />
+    <!-- modernizr css -->
+    <script src="assets/js/vendor/modernizr-2.8.3.min.js"></script>
+  </head>
+
+  <body>
+    <script
+      type="module"
+      src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"
+    ></script>
+    <script type="module">
+      import { FIREBASE_CONFIG } from "./config.js";
+      //for firebase app
+      import {
+        //determine which services you want to use
+        initializeApp,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-app.js";
+      //for realtime database
+      import {
+        //determine which services you want to use
+        getDatabase,
+        ref,
+        set,
+        get,
+        onValue,
+        push,
+        child,
+        update,
+        remove,
+        query,
+        orderByChild,
+        limitToFirst,
+        limitToLast,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-database.js";
+      //for auth
+      import {
+        //determine which services you want to use
+        getAuth,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        onAuthStateChanged,
+        signOut,
+      } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-auth.js";
+
+      const app = initializeApp(FIREBASE_CONFIG);
+      const db = getDatabase();
+      const auth = getAuth();
+
+      const UID = localStorage.getItem("user");
+
+      //How many to show for the leaderboard
+      let amtShown = 10;
+
+      //Stats user would want to know
+      let userCoins = 0;
+      let userTotalTime = 0;
+      let userUsername = "";
+      let userPuzzlePieces = 0;
+
+      let btnLogOut = document.getElementById("logout");
+      btnLogOut.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        console.log("signing out");
+        signOut(auth);
+        //Remove the user from the local storage
+        localStorage.removeItem("user");
+        if (localStorage.getItem("userCoins") != null){
+          localStorage.removeItem("userCoins");
+        }
+        window.location.href = "index.html";
+      });
+
+      // onValue(db, "players/" + UID, (snapshot) => {
+      //   const data = snapshot.val();
+      //   getPlayers(data);
+      // });
+
+      (async () => {
+        await getPlayers();
+        await getPuzzle();
+        await assignStats();
+
+        await getLeaderboard();
+      })();
+
+      async function getPlayers() {
+        console.log("getting player: " + UID);
+        await get(ref(db, "players/" + UID)).then((snapshot) => {
+          if (snapshot.exists()) {
+            try {
+              let content = "";
+              snapshot.forEach((childSnapshot) => {
+                if (childSnapshot.key == "coins") {
+                  userCoins = childSnapshot.val();
+                } else if (childSnapshot.key == "totalTime") {
+                  userTotalTime = childSnapshot.val();
+                } else if (childSnapshot.key == "username") {
+                  userUsername = childSnapshot.val();
+                  $("#username").text(userUsername);
+                }
+              });
+            } catch (error) {
+              console.log(error);
+            }
+          } else {
+            console.log("snapshot does not exist");
+          }
+        });
+      }
+      async function getPuzzle() {
+        console.log("getting puzzle for: " + UID);
+        await get(ref(db, "puzzlePieces/" + UID)).then((snapshot) => {
+          if (snapshot.exists()) {
+            try {
+              let content = "";
+              let temp = "";
+              snapshot.forEach((childSnapshot) => {
+                if (childSnapshot.val() == true) {
+                  temp += childSnapshot.key.substr(4, 1);
+                } else {
+                  temp += "0";
+                }
+              });
+              userPuzzlePieces = temp;
+              return userPuzzlePieces;
+            } catch (error) {
+              console.log(error);
+            }
+          } else {
+            console.log("snapshot does not exist");
+          }
+        });
+      }
+      async function getLeaderboard() {
+        console.log("getting and sorting leaderboard");
+        let leaderboardRef = query(ref(db, "leaderboard"),  orderByChild("totalTime", "desc"), limitToFirst(amtShown));
+
+        await get(leaderboardRef).then((snapshot) => {
+          if (snapshot.exists()) {
+            try {
+              let content = "";
+              let count = 1;
+              let topPlayers = [];
+              //setup our temp arrays
+              let playerDataTable = document.getElementById("player-data");
+              playerDataTable.innerHTML = "";
+
+              let playerData = "";
+              snapshot.forEach((childSnapshot) => {
+                console.log("leaderboard rank "+count);
+                let player = childSnapshot.val();
+                
+                topPlayers.push(player.username);
+
+                // Create row element
+                let row = document.createElement("tr");
+
+                // Change row color based on ranking
+                if (count == 1){
+                  row.style.backgroundColor ='rgba(255,215,0,0.7)';
+                } else if (count == 2){
+                  row.style.backgroundColor ='rgba(192,192,192,0.7)';
+                } else if (count == 3){
+                  row.style.backgroundColor ='rgba(205,127,50,0.7)';
+                } else if (count%2 == 1) {
+                  row.style.backgroundColor ='rgba(231,233,235,0.7)';
+                }
+
+                // Create cells
+                let ranking = document.createElement("td");
+                let username = document.createElement("td");
+                let time = document.createElement("td");
+
+                // Insert data to cells
+                ranking.innerText = "#"+count;
+                username.innerText = player.username;
+                time.innerText = player.totalTime;
+
+                // Append cells to row
+                row.appendChild(ranking);
+                row.appendChild(username);
+                row.appendChild(time);
+
+                // Append row to table body
+                playerDataTable.appendChild(row);
+                count += 1;        
+              });
+              if (count == (amtShown + 1) && topPlayers.includes(userUsername) == false){ //If all players are added and user is not in, add user at the bottom 
+                  let leaderboardPlayerRef = query(ref(db, "leaderboard"),  orderByChild("totalTime", "desc"));
+                  get(leaderboardPlayerRef).then((snapshot) => {
+                    if (snapshot.exists()) {
+                      try {
+                        let content = "";
+                        let count = 1;
+                        //setup our temp arrays
+                        let playerDataTable = document.getElementById("player-data");
+                        let playerData = "";
+                        snapshot.forEach((childSnapshot) => {
+                          if (childSnapshot.key == UID){
+                            let player = childSnapshot.val();
+                            //Create empty in between
+                            let rowF = document.createElement("tr");
+                            let rankingF = document.createElement("td");
+                            let usernameF = document.createElement("td");
+                            let timeF = document.createElement("td");
+                            rankingF.innerText = ":";
+                            usernameF.innerText = ":";
+                            timeF.innerText = ":";
+                            rowF.appendChild(rankingF);
+                            rowF.appendChild(usernameF);
+                            rowF.appendChild(timeF);
+                            playerDataTable.appendChild(rowF);
+
+                            // Create row element
+                            let row = document.createElement("tr");
+                            if (count%2 == 1) {
+                              row.style.backgroundColor ='rgba(231,233,235,0.7)';
+                            }
+
+                            // Create cells
+                            let ranking = document.createElement("td");
+                            let username = document.createElement("td");
+                            let time = document.createElement("td");
+
+                            // Insert data to cells
+                            ranking.innerText = "#"+count;
+                            username.innerText = player.username;
+                            time.innerText = player.totalTime;
+
+                            // Append cells to row
+                            row.appendChild(ranking);
+                            row.appendChild(username);
+                            row.appendChild(time);
+
+                            // Append row to table body
+                            playerDataTable.appendChild(row);
+                          }
+                          count += 1;    
+                        });
+                      } catch (error) {
+                        console.log(error);
+                      }
+                    } else {
+                      console.log("snapshot does not exist");
+                    }
+                  });
+                }
+            } catch (error) {
+              console.log(error);
+            }
+          } else {
+            console.log("snapshot does not exist");
+          }
+        });
+      }
+      function assignStats() {
+        console.log("assigning stats");
+        $("#user_name").text(userUsername);
+        $("#user_coins").text(userCoins + " coins");
+        let puzzle = userPuzzlePieces.toString().replace(/0/g, "").length;
+        $("#user_puzzle").text(puzzle + " / 3");
+        $("#user_time").text(Math.round(userTotalTime / 60) + " minutes");
+      }
+    </script>
+    <!-- preloader area start -->
+    <div id="preloader">
+      <div class="loader"></div>
+    </div>
+    <!-- preloader area end -->
+    <!-- page container area start -->
+    <div class="page-container">
+      <!-- sidebar menu area start -->
+      <div class="sidebar-menu">
+        <div class="sidebar-header">
+          <div class="logo">
+            <a href="userProfile.html"
+              ><img src="assets/images/icon/logo.png" alt="logo"
+            /></a>
+          </div>
+        </div>
+        <div class="main-menu">
+          <div class="menu-inner">
+            <nav>
+              <ul class="metismenu" id="menu">
+                <li class="active">
+                  <a href="userProfile.html">Profile</a>
+                </li>
+                <li><a href="userShop.html">Shop</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+      <!-- sidebar menu area end -->
+      <!-- main content area start -->
+      <div class="main-content">
+        <!-- header area start -->
+        <div class="header-area">
+          <div class="row align-items-center">
+            <!-- nav and search button -->
+            <div class="col-md-6 col-sm-8 clearfix">
+              <div class="nav-btn pull-left">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+            <!-- profile info & task notification -->
+            <div class="col-md-6 col-sm-4 clearfix">
+              <ul class="notification-area pull-right">
+                <li id="full-view"><i class="ti-fullscreen"></i></li>
+                <li id="full-view-exit"><i class="ti-zoom-out"></i></li>
+
+                <li class="settings-btn">
+                  <i class="ti-settings"></i>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <!-- header area end -->
+        <!-- offset area start -->
+        <div class="offset-area">
+          <div class="offset-close"><i class="ti-close"></i></div>
+          <ul class="nav offset-menu-tab">
+            <li>
+              <a class="active" data-toggle="tab" href="#settings">Settings</a>
+            </li>
+            <li>
+              <a data-toggle="tab"></a>
+            </li>
+          </ul>
+          <div class="offset-content tab-content">
+            <div id="settings" class="tab-pane fade in show active">
+              <div class="offset-settings">
+                <h4>General Settings</h4>
+                <div class="settings-list">
+                  <div class="s-settings">
+                    <div class="s-sw-title">
+                      <h5>Notifications</h5>
+                      <div class="s-swtich">
+                        <input type="checkbox" id="switch1" />
+                        <label for="switch1">Toggle</label>
+                      </div>
+                    </div>
+                    <p>Toggle 'On' to get all notifications.</p>
+                  </div>
+                  <div class="s-settings">
+                    <div class="s-sw-title">
+                      <h5>Link to Phone Number</h5>
+                      <div class="s-swtich">
+                        <input type="checkbox" id="switch3" checked />
+                        <label for="switch3">Toggle</label>
+                      </div>
+                    </div>
+                    <p>
+                      Toggle 'On' to link your account to your phone number.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- offset area end -->
+        <!-- page title area start -->
+        <div class="page-title-area">
+          <div class="row align-items-center">
+            <div class="col-sm-6">
+              <div class="breadcrumbs-area clearfix">
+                <h4 class="page-title pull-left">Tour-rific</h4>
+                <ul class="breadcrumbs pull-left">
+                  <li><a>User</a></li>
+                  <li><span>Profile</span></li>
+                </ul>
+              </div>
+            </div>
+            <div class="col-sm-6 clearfix">
+              <div class="user-profile pull-right">
+                <img
+                  class="avatar user-thumb"
+                  src="assets/images/author/avatar.png"
+                  alt="avatar"
+                />
+                <h4
+                  class="user-name dropdown-toggle"
+                  data-toggle="dropdown"
+                  id="username"
+                >
+                  - <i class="fa fa-angle-down"></i>
+                </h4>
+                <div class="dropdown-menu">
+                  <!-- <a class="dropdown-item" href="#">Profile</a> -->
+                  <a class="dropdown-item" id="logout" href="index.html"
+                    >Log Out</a
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- page title area end -->
+        <div class="main-content-inner">
+          <!-- stats start -->
+          <div class="row">
+            <div class="col-md-6 mt-5 mb-3">
+              <div class="card">
+                <button
+                  class="seo-fact sbg3"
+                  style="border: none"
+                  onclick="changeUsername()"
+                >
+                  <div
+                    class="p-4 d-flex justify-content-between align-items-center"
+                  >
+                    <div class="seofct-icon">
+                      <i class="ti-id-badge"></i>Username (Click to change)
+                    </div>
+                    <h2 id="user_name">-</h2>
+                  </div>
+                </button>
+              </div>
+            </div>
+            <script>
+              function changeUsername() {
+                console.log("changing username");
+                window.location.href = "changeUsername.html";
+              }
+            </script>
+            <div class="col-md-6 mt-md-5 mb-3">
+              <div class="card">
+                <div class="seo-fact sbg4">
+                  <div
+                    class="p-4 d-flex justify-content-between align-items-center"
+                  >
+                    <div class="seofct-icon"><i class="ti-money"></i>Coins</div>
+                    <h2 id="user_coins">0</h2>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mt-md-5 mb-3">
+              <div class="card">
+                <div class="seo-fact sbg2">
+                  <div
+                    class="p-4 d-flex justify-content-between align-items-center"
+                  >
+                    <div class="seofct-icon">
+                      <i class="ti-game"></i> Puzzle Pieces
+                    </div>
+                    <h2 id="user_puzzle">0 / 3</h2>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mt-md-5 mb-3">
+              <div class="card">
+                <div class="seo-fact sbg1">
+                  <div
+                    class="p-4 d-flex justify-content-between align-items-center"
+                  >
+                    <div class="seofct-icon">
+                      <i class="ti-timer"></i> Total Time Played
+                    </div>
+                    <h2 id="user_time">0</h2>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- stats end -->
+          <div class="main-content-inner">
+            <!-- leaderboard area start -->
+            <div class="card mt-5">
+              <div class="card-body">
+                <div class="row-mr-5">
+                  <h4 class="header-title mb-5">Leaderboard</h4>
+                </div>
+                <div class="table-responsive">
+                  <table class="table">
+                    <thead>
+                      <tr class="heading-td">
+                        <th>Ranking</th>
+                        <th>Username</th>
+                        <th>Time Taken</th>
+                      </tr>
+                    </thead>
+                    <tbody id="player-data"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <!-- leaderboard area end -->
+          <!-- row area start-->
+        </div>
+      </div>
+      <!-- main content area end -->
+      <!-- footer area start-->
+      <footer>
+        <div class="footer-area">
+          <p>
+            © Copyright 2018. All right reserved. Template by
+            <a href="https://colorlib.com/wp/">Colorlib</a>.
+          </p>
+        </div>
+      </footer>
+      <!-- footer area end-->
+    </div>
+    <!-- page container area end -->
+    <!-- jquery latest version -->
+    <script src="assets/js/vendor/jquery-2.2.4.min.js"></script>
+    <!-- bootstrap 4 js -->
+    <script src="assets/js/popper.min.js"></script>
+    <script src="assets/js/bootstrap.min.js"></script>
+    <script src="assets/js/owl.carousel.min.js"></script>
+    <script src="assets/js/metisMenu.min.js"></script>
+    <script src="assets/js/jquery.slimscroll.min.js"></script>
+    <script src="assets/js/jquery.slicknav.min.js"></script>
+
+    <!-- start chart js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js"></script>
+    <!-- start highcharts js -->
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+    <!-- start zingchart js -->
+    <script src="https://cdn.zingchart.com/zingchart.min.js"></script>
+    <script>
+      zingchart.MODULESDIR = "https://cdn.zingchart.com/modules/";
+      ZC.LICENSE = [
+        "569d52cefae586f634c54f86dc99e6a9",
+        "ee6b7db5b51705a13dc2339db3edaf6d",
+      ];
+    </script>
+    <!-- start amcharts -->
+    <script src="https://www.amcharts.com/lib/3/amcharts.js"></script>
+    <script src="https://www.amcharts.com/lib/3/ammap.js"></script>
+    <script src="https://www.amcharts.com/lib/3/maps/js/worldLow.js"></script>
+    <script src="https://www.amcharts.com/lib/3/serial.js"></script>
+    <script src="https://www.amcharts.com/lib/3/plugins/export/export.min.js"></script>
+    <script src="https://www.amcharts.com/lib/3/themes/light.js"></script>
+    <!-- others plugins -->
+    <script src="assets/js/plugins.js"></script>
+    <script src="assets/js/scripts.js"></script>
+  </body>
+</html>
